@@ -46,7 +46,9 @@ This script is designed to scrape story metadata and content from Archive of Our
  	```
 	
 	• The number of stories to scrape.
- 5. Scraped metadata will be saved in stories_metadata.csv. EPUB files will be stored in the content directory.
+
+    **Note:** _Some popular fandom links are available in ```scraping links``` file. You can simply copy any link from that file and paste it in the console input when prompted._
+ 6. Scraped metadata will be saved in stories_metadata.csv. EPUB files will be stored in the content directory.
 
 ## Dependencies
 
