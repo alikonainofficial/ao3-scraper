@@ -1,4 +1,4 @@
-### AO3 Scraper
+# AO3 Scraper
 
 This script is designed to scrape story metadata and content from Archive of Our Own (AO3), allowing users to extract story details and download stories in EPUB format.
 
