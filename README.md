@@ -62,8 +62,10 @@ Logs are saved in ```scrape_ao3_story_content.log``` for tracking progress and e
 
 ## Notes
 
-	• This script is for personal use only and should not be used to violate AO3’s Terms of Service.
-	• Large-scale scraping may lead to your IP being blocked by AO3. Use responsibly.
+• This script is for personal use only and should not be used to violate AO3’s Terms of Service.
+
+• Large-scale scraping may lead to your IP being blocked by AO3. Use responsibly.
+ 
 
 ## License
 
