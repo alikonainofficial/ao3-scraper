@@ -2,5 +2,4 @@ content
 scrape_ao3_story_content.log
 scraped_stories.txt
 stories_metadata.csv
-tester.py
 .env
