@@ -201,6 +201,46 @@ def populate_metadata(story_id, story_url, story_soup):
     return metadata
 
 
+# Function to make a request with exponential backoff and delay adjustments
+def make_request(url, headers=None, retries=5, initial_delay=2, max_delay=60, timeout=30):
+    """
+    Make a request with exponential backoff and skip if retries are exhausted.
+
+    Args:
+        url (str): The URL to request.
+        headers (dict): Optional headers for the request.
+        retries (int): Number of retry attempts.
+        initial_delay (int): Initial wait time in seconds.
+        max_delay (int): Maximum wait time in seconds.
+        timeout (int): Request timeout in seconds.
+
+    Returns:
+        requests.Response or None: The response if successful, None if retries are exhausted.
+    """
+    wait_time = initial_delay
+    response = None
+    for i in range(retries):
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            if wait_time > initial_delay:
+                wait_time = max(
+                    initial_delay, wait_time // 2
+                )  # Reduce delay if it was increased before
+            return response
+        except requests.RequestException as e:
+            logging.error(f"Error fetching {url}: {e}")
+            if response and response.status_code == 429:
+                logging.warning(f"Rate limited (429) for {url}. Adjusting backoff.")
+            if i < retries - 1:
+                logging.info(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                wait_time = min(max_delay, wait_time * 2)  # Exponential backoff
+            else:
+                logging.error(f"Failed to fetch {url} after {retries} retries")
+                return None
+
+
 def scrape_ao3_stories(main_link, num_stories):
     """
     Scrape metadata and content from AO3 stories.
@@ -217,8 +257,6 @@ def scrape_ao3_stories(main_link, num_stories):
     content_dir = "content"
     scraped_file = "scraped_stories.txt"
     output_csv = "stories_metadata.csv"
-    retries = 5
-    backoff_factor = 2
 
     # Ensure content directory exists
     os.makedirs(content_dir, exist_ok=True)
@@ -266,27 +304,14 @@ def scrape_ao3_stories(main_link, num_stories):
 
     while scraped_count < num_stories:
         page_url = main_link.replace("page=1", f"page={current_page}")
-        response = None
+        response = make_request(page_url, headers=headers, retries=5, initial_delay=2, max_delay=60)
+        if not response:
+            log_to_console_and_file("warning", "Skipping page due to repeated errors: %s", page_url)
+            current_page += 1
+            continue
 
-        # Fetch page with retries and exponential backoff
-        for attempt in range(retries):
-            try:
-                response = requests.get(page_url, headers=headers, timeout=30)
-                response.raise_for_status()
-                break
-            except requests.RequestException as e:
-                log_to_console_and_file(
-                    "error",
-                    "Failed to fetch page %s (attempt %d/%d): %s",
-                    page_url,
-                    attempt + 1,
-                    retries,
-                    e,
-                )
-                if attempt < retries - 1:
-                    time.sleep(backoff_factor**attempt)
-                else:
-                    return
+        soup = BeautifulSoup(response.content, "html.parser")
+        works = soup.find_all("li", class_="work")
 
         soup = BeautifulSoup(response.content, "html.parser")
         works = soup.find_all("li", class_="work")
@@ -305,11 +330,17 @@ def scrape_ao3_stories(main_link, num_stories):
                     story_url = f"https://archiveofourown.org{story_link}?view_adult=true"
                     if story_id in scraped_ids:
                         continue
-                    try:
-                        story_page = requests.get(story_url, headers=headers, timeout=30)
-                        story_page.raise_for_status()
-                        story_soup = BeautifulSoup(story_page.content, "html.parser")
+                    story_response = make_request(
+                        story_url, headers=headers, retries=5, initial_delay=2, max_delay=60
+                    )
+                    if not story_response:
+                        log_to_console_and_file(
+                            "warning", "Skipping story due to repeated errors: %s", story_url
+                        )
+                        continue
+                    story_soup = BeautifulSoup(story_response.content, "html.parser")
 
+                    try:
                         # Scrape metadata
                         metadata = populate_metadata(story_id, story_url, story_soup)
 
@@ -323,7 +354,9 @@ def scrape_ao3_stories(main_link, num_stories):
                             "a", href=True, string="EPUB"
                         )["href"]
                         epub_url = f"https://archiveofourown.org{download_link}"
-                        epub_response = requests.get(epub_url, headers=headers, timeout=30)
+                        epub_response = make_request(
+                            epub_url, headers=headers, retries=5, initial_delay=2, max_delay=60
+                        )
                         epub_file_path = os.path.join(content_dir, f"{metadata['ID']}.epub")
 
                         with open(epub_file_path, "wb") as epub_file:
