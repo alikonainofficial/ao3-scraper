@@ -329,6 +329,7 @@ def scrape_ao3_stories(main_link, num_stories):
                     story_id = story_link.split("/")[-1]
                     story_url = f"https://archiveofourown.org{story_link}?view_adult=true"
                     if story_id in scraped_ids:
+                        print("Skipping as this story is already scrapped", story_id)
                         continue
                     story_response = make_request(
                         story_url, headers=headers, retries=5, initial_delay=2, max_delay=60
